@@ -6,8 +6,11 @@
 
 hraftd
 **/hraftd
+data/
 
 # Folders
+.idea/
+.vscode/
 _obj
 _test
 

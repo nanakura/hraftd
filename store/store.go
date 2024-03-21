@@ -10,6 +10,9 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	raftpebbledb "gitee.com/asphodelus_dev/raft-pebbledb"
+	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/vfs"
 	"io"
 	"log"
 	"net"
@@ -19,7 +22,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
 )
 
 const (
@@ -87,14 +89,21 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 		logStore = raft.NewInmemStore()
 		stableStore = raft.NewInmemStore()
 	} else {
-		boltDB, err := raftboltdb.New(raftboltdb.Options{
-			Path: filepath.Join(s.RaftDir, "raft.db"),
-		})
+		dir := filepath.Join(s.RaftDir, "raft-pebble")
+		walDir := filepath.Join(s.RaftDir, "raft-pebble-wal")
+		pebbleDB, err := raftpebbledb.New(
+			raftpebbledb.WithConfig(raftpebbledb.GetDefaultRaftLogRocksDBConfig()),
+			raftpebbledb.WithLogger(pebble.DefaultLogger),
+			raftpebbledb.WithFS(vfs.Default),
+			raftpebbledb.WithWalDirPath(walDir),
+			raftpebbledb.WithDbDirPath(dir),
+			raftpebbledb.WithPebbleOptions(nil),
+		)
 		if err != nil {
-			return fmt.Errorf("new bbolt store: %s", err)
+			return fmt.Errorf("new pebbledb store: %s", err)
 		}
-		logStore = boltDB
-		stableStore = boltDB
+		logStore = pebbleDB
+		stableStore = pebbleDB
 	}
 
 	// Instantiate the Raft systems.
